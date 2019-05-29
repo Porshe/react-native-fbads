@@ -1,3 +1,5 @@
+v.6.1.0
+
 # react-native-fbads [![npm version][version-badge]][package]
 
 [![chat][chat-badge]][chat]
