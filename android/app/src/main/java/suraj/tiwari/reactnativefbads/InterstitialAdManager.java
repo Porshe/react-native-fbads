@@ -1,14 +1,19 @@
 package suraj.tiwari.reactnativefbads;
 
+import android.support.annotation.Nullable;
+
 import com.facebook.ads.Ad;
 import com.facebook.ads.AdError;
 import com.facebook.ads.InterstitialAd;
 import com.facebook.ads.InterstitialAdListener;
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 
 public class InterstitialAdManager extends ReactContextBaseJavaModule implements InterstitialAdListener, LifecycleEventListener {
 
@@ -22,17 +27,29 @@ public class InterstitialAdManager extends ReactContextBaseJavaModule implements
   }
 
   @ReactMethod
-  public void showAd(String placementId, Promise p) {
+  public void requestAd(String placementId) {
+    ReactApplicationContext reactContext = this.getReactApplicationContext();
+
+    mInterstitial = new InterstitialAd(reactContext, placementId);
+    mInterstitial.setAdListener(this);
+    mInterstitial.loadAd();
+  }
+
+  @ReactMethod
+  public void showAd(Promise p) {
     if (mPromise != null) {
       p.reject("E_FAILED_TO_SHOW", "Only one `showAd` can be called at once");
       return;
     }
-    ReactApplicationContext reactContext = this.getReactApplicationContext();
 
     mPromise = p;
-    mInterstitial = new InterstitialAd(reactContext, placementId);
-    mInterstitial.setAdListener(this);
-    mInterstitial.loadAd();
+    if(!mInterstitial.isAdLoaded()){
+      mPromise.reject("E_FAILED_TO_LOAD", "Ad not loaded");
+      cleanUp();
+      return;
+    }
+
+    mInterstitial.show();
   }
 
   @Override
@@ -42,15 +59,16 @@ public class InterstitialAdManager extends ReactContextBaseJavaModule implements
 
   @Override
   public void onError(Ad ad, AdError adError) {
-    mPromise.reject("E_FAILED_TO_LOAD", adError.getErrorMessage());
+    WritableMap event = Arguments.createMap();
+    event.putString("error", adError.getErrorMessage());
+    sendEvent("fbInterstitialDidFail", event);
+
     cleanUp();
   }
 
   @Override
   public void onAdLoaded(Ad ad) {
-    if (ad == mInterstitial) {
-      mInterstitial.show();
-    }
+    sendEvent("fbInterstitialDidLoad", null);
   }
 
   @Override
@@ -61,6 +79,7 @@ public class InterstitialAdManager extends ReactContextBaseJavaModule implements
   @Override
   public void onInterstitialDismissed(Ad ad) {
     mPromise.resolve(mDidClick);
+    sendEvent("fbInterstitialDidClose", null);
     cleanUp();
   }
 
@@ -96,5 +115,10 @@ public class InterstitialAdManager extends ReactContextBaseJavaModule implements
   @Override
   public void onHostDestroy() {
     cleanUp();
+  }
+
+
+  private void sendEvent(String eventName, @Nullable WritableMap params) {
+    getReactApplicationContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit(eventName, params);
   }
 }
