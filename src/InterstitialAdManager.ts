@@ -4,13 +4,13 @@ import { NativeModules, DeviceEventEmitter } from 'react-native';
 
 const { CTKInterstitialAdManager } = NativeModules;
 
-const eventHandlers = {
-    fbInterstitialDidLoad: new Map(),
-    fbInterstitialDidFail: new Map(),
-    fbInterstitialDidClose: new Map(),
+const eventHandlers:{ [index:string] : Map<(error?: string)=>void, any> } = {
+    fbInterstitialDidLoad: new Map<()=>void, any>(),
+    fbInterstitialDidFail: new Map<(error?: string)=>void, any>(),
+    fbInterstitialDidClose: new Map<()=>void, any>(),
 };
 
-const addEventListener = (type, handler) => {
+const addEventListener = (type: string, handler: (error?: string)=>void) => {
     switch (type) {
         case 'fbInterstitialDidLoad':
             eventHandlers[type].set(handler, DeviceEventEmitter.addListener(type, handler));
@@ -26,7 +26,7 @@ const addEventListener = (type, handler) => {
     }
 }
 
-const removeEventListener = (type, handler) => {
+const removeEventListener = (type: string, handler: ()=>void) => {
     if (!eventHandlers[type].has(handler)) {
         return;
     }
