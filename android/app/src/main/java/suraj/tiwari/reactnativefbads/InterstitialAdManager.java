@@ -43,7 +43,7 @@ public class InterstitialAdManager extends ReactContextBaseJavaModule implements
     }
 
     mPromise = p;
-    if(!mInterstitial.isAdLoaded()){
+    if(mInterstitial == null || !mInterstitial.isAdLoaded()){
       mPromise.reject("E_FAILED_TO_LOAD", "Ad not loaded");
       cleanUp();
       return;
