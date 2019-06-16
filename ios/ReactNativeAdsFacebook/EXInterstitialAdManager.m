@@ -38,8 +38,24 @@ RCT_EXPORT_MODULE(CTKInterstitialAdManager)
 }
 
 RCT_EXPORT_METHOD(
-  showAd:(NSString *)placementId
-  resolver:(RCTPromiseResolveBlock)resolve
+  requestAd:(NSString *)placementId
+)
+{
+    RCTAssert(_isBackground == false, @"`showAd` can be called only when experience is running in foreground");
+    //  if (![EXFacebook facebookAppIdFromNSBundle]) {
+    //    RCTLogWarn(@"No Facebook app id is specified. Facebook ads may have undefined behavior.");
+    //  }
+    
+    _interstitialAd = [[FBInterstitialAd alloc] initWithPlacementID:placementId];
+    _interstitialAd.delegate = self;
+    //  [EXUtil performSynchronouslyOnMainThread:^{
+    [self->_interstitialAd loadAd];
+    //  }];
+}
+
+RCT_EXPORT_METHOD(
+  showAd:
+  (RCTPromiseResolveBlock)resolve
   rejecter:(RCTPromiseRejectBlock)reject
 )
 {
@@ -51,25 +67,26 @@ RCT_EXPORT_METHOD(
   
   _resolve = resolve;
   _reject = reject;
-  
-  _interstitialAd = [[FBInterstitialAd alloc] initWithPlacementID:placementId];
-  _interstitialAd.delegate = self;
-//  [EXUtil performSynchronouslyOnMainThread:^{
-    [self->_interstitialAd loadAd];
-//  }];
+    
+    if(_interstitialAd == nil || !_interstitialAd.isAdValid){
+        _reject(@"E_FAILED_TO_LOAD", @"Ad not loaded", nil);
+        [self cleanUpAd];
+        return;
+    }
+
+    [_interstitialAd showAdFromRootViewController:RCTPresentedViewController()];
 }
 
 #pragma mark - FBInterstitialAdDelegate
 
 - (void)interstitialAdDidLoad:(__unused FBInterstitialAd *)interstitialAd
 {
-  [_interstitialAd showAdFromRootViewController:RCTPresentedViewController()];
+  [self.bridge.eventDispatcher sendDeviceEventWithName:@"fbInterstitialDidLoad" body:nil];
 }
 
 - (void)interstitialAd:(FBInterstitialAd *)interstitialAd didFailWithError:(NSError *)error
 {
-  _reject(@"E_FAILED_TO_LOAD", [error localizedDescription], error);
-  
+  [self.bridge.eventDispatcher sendDeviceEventWithName:@"fbInterstitialDidFail" body:@{@"error": [error localizedDescription]}];
   [self cleanUpAd];
 }
 
@@ -81,7 +98,7 @@ RCT_EXPORT_METHOD(
 - (void)interstitialAdDidClose:(FBInterstitialAd *)interstitialAd
 {
   _resolve(@(_didClick));
-  
+  [self.bridge.eventDispatcher sendDeviceEventWithName:@"fbInterstitialDidClose" body:nil];
   [self cleanUpAd];
 }
 
